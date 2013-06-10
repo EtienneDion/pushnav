@@ -12,7 +12,7 @@
 
     var settings = {
         defaultTarget: ".pushnav-defaulttarget",
-        stopPropagation: false,
+        stopImmediatePropagation: false,
         disableNotModern: false,
         debug: false
     };
@@ -20,7 +20,6 @@
 
 
     var isModern = isSupportPushState(),
-        isActive = false,
         History = window.History,
         oldStateUrl,
         fromId,
@@ -32,9 +31,7 @@
 
     $.pushnav = function (opts) {
         $.extend(settings, opts);
-         isActive = isActivePushnav();
-
-       if (isActive) {
+        if(!settings.disableNotModern) {
             fromUrl = window.location.href;
             init();
         }
@@ -46,20 +43,16 @@
 
 
     $.pushnav.transition = function (from, to, handler) {
-        if (isActive) {
-            var trans = new Transition(from, to, handler);
-            transitions.push(trans);
-        }
+        var trans = new Transition(from, to, handler);
+        transitions.push(trans);
         return $.pushnav;
     };
 
     $.pushnav.attach = function (links, target) {
 
-        if (isActive) {
-            $("body").delegate(links,"click", function (e) {
-                ajaxLinksOnClick(e, target);
-            });
-        }
+        $("body").delegate(links,"click", function (e) {
+            ajaxLinksOnClick(e, target);
+        });
         return $.pushnav;
     };
 
@@ -174,17 +167,22 @@
 
     function init() {
         oldStateUrl = History.getState().url;
-        $("body").delegate("[data-ajax-target]","click", ajaxLinksOnClick);
+        $("body").delegate("click", "[data-ajax-target]", ajaxLinksOnClick);
+        console.log("bind");
         createEvents();
         reEnhanceAjaxLink(window.location.href);
     }
 
     function ajaxLinksOnClick(evt, target) {
+
+        console.log("click");
         evt.preventDefault();
-        
+
+        if (settings.stopImmediatePropagation) evt.stopImmediatePropagation();
+
         var $current =  $(evt.currentTarget),
             url = $current.attr("href"),
-            target = target || $current.attr("data-ajax-target") ;
+            target = target || $current.attr("data-ajax-target");
 
         if($(target).length > 0) {
             oldStateUrl = History.getState().url;
@@ -192,12 +190,6 @@
         } else {
             if(settings.debug) History.log("Pushnav: This target isn' valid, please enter valid one" + target );
         }
-
-        if (settings.stopPropagation) {
-            evt.stopPropagation();
-            return false;
-        } 
-        
     }
 
     function onStateChange(url,target) {
@@ -253,9 +245,8 @@
 
     function loadNewContent(opts) {
 
-        var url = encodeURI(opts);
         $.ajax({
-            url: url,
+            url: opts.url,
             dataType: "html",
             beforeSend: function(xhr) {
                 $("body").addClass("pushNav-loading");
@@ -281,40 +272,46 @@
             tempTransitions = transitions.slice(),
             transition,
             transitionState,
-            $elem = $(opts.target),
-            targetWithoutPrefix = opts.target.substr(1,opts.target.length),
-            $data = $(opts.data).hasClass(targetWithoutPrefix) || $(opts.data).is("[id='"+targetWithoutPrefix+"']") ? $(opts.data) : $(opts.data).find(opts.target);
+            selectorArray = opts.target.split(',');
 
-        tempTransitions.push(swapTransition);
+            $.each(selectorArray, function(index, value){
 
-        transitionState = {
-            "from": $from,
-            "newContentRaw": opts.data,
-            "newContent": $data,
-            "fromUrl": fromUrl,
-            "toUrl": opts.url,
-            "fromId": fromId,
-            "target": $elem
-        };
+                var $elem = $(value);
+                var targetWithoutPrefix = value.substr(1,value.length),
+                    $data = $(opts.data).hasClass(targetWithoutPrefix) || $(opts.data).is("[id='"+targetWithoutPrefix+"']") ? $(opts.data) : $(opts.data).find(value);
 
-        for (i = 0; i < tempTransitions.length; i++) {
-            transition = tempTransitions[i];
-            if (transition.test(transitionState)) {
-                result = transition.transit(transitionState);
-                if (result === false) break;
-            }
-        }
+                tempTransitions.push(swapTransition);
 
-        var to = transitionState.newContentRaw.find(".document-body").data("section");
-        $("body").data("section", to);
-        $("body").attr("data-section", to);
+                transitionState = {
+                    "from": $from,
+                    "newContentRaw": opts.data,
+                    "newContent": $data,
+                    "fromUrl": fromUrl,
+                    "toUrl": opts.url,
+                    "fromId": fromId,
+                    "target": $elem
+                };
 
-        fromUrl = opts.url;
-        fromId = $data;
-        $from = opts.data;
+                for (i = 0; i < tempTransitions.length; i++) {
+                    transition = tempTransitions[i];
+                    if (transition.test(transitionState)) {
+                        result = transition.transit(transitionState);
+                        if (result === false) break;
+                    }
+                }
 
-        $(window).trigger("content_change.pushnav");
-        reEnhanceAjaxLink(opts.url);
+                var to = transitionState.newContentRaw.find(".document-body").data("section");
+                $("body").data("section", to);
+                $("body").attr("data-section", to);
+
+                fromUrl = opts.url;
+                fromId = $data;
+                $from = opts.data;
+
+                $(window).trigger("content_change.pushnav");
+                reEnhanceAjaxLink(opts.url);
+            });
+
 
     }
 
@@ -390,9 +387,6 @@
         return !!(window.history && window.history.pushState);
     }
 
-    function isActivePushnav() {
-        return (!isModern && settings.disableNotModern) ? false : true ;
-    }
 
     /**
      * Return all params from a url
@@ -426,7 +420,6 @@
     }
 
 })(jQuery);
-
 
 
 
