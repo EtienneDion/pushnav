@@ -71,9 +71,9 @@ To instantiate a link, you just have to add data-ajax-target with the DOM select
 <a href="example/description.html" data-ajax-target="#content">Axafiy link</a>
 ```
 
-####$.pushnav.attach
+###$.pushnav.attach
 A second way to instantiate a link could be like this:
-$.pushnav.attach(selector, event, target, getLink)
+####$.pushnav.attach(selector, event, target, getLink)
 
 Param :
 
@@ -95,7 +95,7 @@ $.pushnav.attach("a", "click", "#content", function(clickEventFromAnchor){ retur
 
 With pushnav.attach() we can combine it with transition:
 
-####$.pushnav.transition()
+###$.pushnav.transition()
 ``` javascript
 $.pushnav.attach().transition()
 ```
