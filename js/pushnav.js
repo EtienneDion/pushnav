@@ -53,15 +53,37 @@
         return $.pushnav;
     };
 
-    $.pushnav.attach = function (links, target) {
+    // selector = element selector
+    // event = jquery event : click, change, focus
+    // target = container to replace
+    // getLink (optional) = function to get the destination url : this function must return a url
+    $.pushnav.attach = function (selector, event, target, getLink) {
 
         if (isActive) {
-            $("body").delegate(links,"click", function (e) {
-                ajaxLinksOnClick(e, target);
+            $("body").delegate(selector, event, function (evt) {
+
+                var $current =  $(evt.currentTarget),
+                    url = "";
+
+                if (typeof getLink !== 'undefined'){
+                    url = getLink(evt);
+                } else {
+                    evt.preventDefault();
+                    url = $current.attr("href");
+                    target = target || $current.attr("data-ajax-target");
+                }
+
+                ajaxLinks(url, target);
+                if (settings.stopPropagation) {
+                    evt.stopPropagation();
+                }
             });
         }
         return $.pushnav;
     };
+
+
+
 
     function Transition(from, to, handler) {
         this.from = from;
@@ -174,17 +196,22 @@
 
     function init() {
         oldStateUrl = History.getState().url;
+
+        var ajaxLinksOnClick = function(evt){
+            evt.preventDefault();
+            var $current =  $(evt.currentTarget),
+                url = $current.attr("href"),
+                target = $current.attr("data-ajax-target");
+
+            ajaxLinks(url, target);
+        };
+
         $("body").delegate("[data-ajax-target]","click", ajaxLinksOnClick);
         createEvents();
         reEnhanceAjaxLink(window.location.href);
     }
 
-    function ajaxLinksOnClick(evt, target) {
-        evt.preventDefault();
-
-        var $current =  $(evt.currentTarget),
-            url = $current.attr("href"),
-            target = target || $current.attr("data-ajax-target") ;
+    function ajaxLinks(url, target) {
 
         if($(target).length > 0) {
             oldStateUrl = History.getState().url;
@@ -194,7 +221,6 @@
         }
 
         if (settings.stopPropagation) {
-            evt.stopPropagation();
             return false;
         }
 
@@ -255,7 +281,7 @@
 
         var url = opts;
         if (typeof opts === 'object'){
-             url = opts.url;
+            url = opts.url;
         }
         url = encodeURI(url);
         $.ajax({
@@ -334,8 +360,26 @@
 
 
     function getUrlToClean(url) {
+
         var urlObj = $.url.parse(url),
-            urlHtml = urlObj.path;
+            urlHtml = urlObj.path,
+            querys = urlObj.query,
+            queryArray = querys.split("&"),
+            notPushNavQuery = "";
+
+        $.each(queryArray, function(index, value){
+            var queryParam = value.split("=");
+            if(typeof queryParam[0] !== 'undefined'){
+                if(queryParam[0] !== "isAjax" && queryParam[0] !== "swaptarget"){
+                    notPushNavQuery = notPushNavQuery + value;
+                }
+            }
+        });
+
+        if(notPushNavQuery !== ""){
+            urlHtml = urlHtml + "?" + notPushNavQuery;
+        }
+
         return urlHtml;
     }
 
@@ -436,6 +480,5 @@
     }
 
 })(jQuery);
-
 
 
