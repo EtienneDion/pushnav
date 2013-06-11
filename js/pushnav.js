@@ -12,7 +12,7 @@
 
     var settings = {
         defaultTarget: ".pushnav-defaulttarget",
-        stopImmediatePropagation: false,
+        stopPropagation: false,
         disableNotModern: false,
         debug: false
     };
@@ -20,6 +20,7 @@
 
 
     var isModern = isSupportPushState(),
+        isActive = false,
         History = window.History,
         oldStateUrl,
         fromId,
@@ -31,7 +32,9 @@
 
     $.pushnav = function (opts) {
         $.extend(settings, opts);
-        if(!settings.disableNotModern) {
+        isActive = isActivePushnav();
+
+        if (isActive) {
             fromUrl = window.location.href;
             init();
         }
@@ -43,16 +46,20 @@
 
 
     $.pushnav.transition = function (from, to, handler) {
-        var trans = new Transition(from, to, handler);
-        transitions.push(trans);
+        if (isActive) {
+            var trans = new Transition(from, to, handler);
+            transitions.push(trans);
+        }
         return $.pushnav;
     };
 
     $.pushnav.attach = function (links, target) {
 
-        $("body").delegate(links,"click", function (e) {
-            ajaxLinksOnClick(e, target);
-        });
+        if (isActive) {
+            $("body").delegate(links,"click", function (e) {
+                ajaxLinksOnClick(e, target);
+            });
+        }
         return $.pushnav;
     };
 
@@ -167,22 +174,17 @@
 
     function init() {
         oldStateUrl = History.getState().url;
-        $("body").delegate("click", "[data-ajax-target]", ajaxLinksOnClick);
-        console.log("bind");
+        $("body").delegate("[data-ajax-target]","click", ajaxLinksOnClick);
         createEvents();
         reEnhanceAjaxLink(window.location.href);
     }
 
     function ajaxLinksOnClick(evt, target) {
-
-        console.log("click");
         evt.preventDefault();
-
-        if (settings.stopImmediatePropagation) evt.stopImmediatePropagation();
 
         var $current =  $(evt.currentTarget),
             url = $current.attr("href"),
-            target = target || $current.attr("data-ajax-target");
+            target = target || $current.attr("data-ajax-target") ;
 
         if($(target).length > 0) {
             oldStateUrl = History.getState().url;
@@ -190,6 +192,12 @@
         } else {
             if(settings.debug) History.log("Pushnav: This target isn' valid, please enter valid one" + target );
         }
+
+        if (settings.stopPropagation) {
+            evt.stopPropagation();
+            return false;
+        }
+
     }
 
     function onStateChange(url,target) {
@@ -245,8 +253,13 @@
 
     function loadNewContent(opts) {
 
+        var url = opts;
+        if (typeof opts === 'object'){
+             url = opts.url;
+        }
+        url = encodeURI(url);
         $.ajax({
-            url: opts.url,
+            url: url,
             dataType: "html",
             beforeSend: function(xhr) {
                 $("body").addClass("pushNav-loading");
@@ -274,43 +287,43 @@
             transitionState,
             selectorArray = opts.target.split(',');
 
-            $.each(selectorArray, function(index, value){
+        $.each(selectorArray, function(index, value){
 
-                var $elem = $(value);
-                var targetWithoutPrefix = value.substr(1,value.length),
-                    $data = $(opts.data).hasClass(targetWithoutPrefix) || $(opts.data).is("[id='"+targetWithoutPrefix+"']") ? $(opts.data) : $(opts.data).find(value);
+            var $elem = $(value);
+            var targetWithoutPrefix = value.substr(1,value.length),
+                $data = $(opts.data).hasClass(targetWithoutPrefix) || $(opts.data).is("[id='"+targetWithoutPrefix+"']") ? $(opts.data) : $(opts.data).find(value);
 
-                tempTransitions.push(swapTransition);
+            tempTransitions.push(swapTransition);
 
-                transitionState = {
-                    "from": $from,
-                    "newContentRaw": opts.data,
-                    "newContent": $data,
-                    "fromUrl": fromUrl,
-                    "toUrl": opts.url,
-                    "fromId": fromId,
-                    "target": $elem
-                };
+            transitionState = {
+                "from": $from,
+                "newContentRaw": opts.data,
+                "newContent": $data,
+                "fromUrl": fromUrl,
+                "toUrl": opts.url,
+                "fromId": fromId,
+                "target": $elem
+            };
 
-                for (i = 0; i < tempTransitions.length; i++) {
-                    transition = tempTransitions[i];
-                    if (transition.test(transitionState)) {
-                        result = transition.transit(transitionState);
-                        if (result === false) break;
-                    }
+            for (i = 0; i < tempTransitions.length; i++) {
+                transition = tempTransitions[i];
+                if (transition.test(transitionState)) {
+                    result = transition.transit(transitionState);
+                    if (result === false) break;
                 }
+            }
 
-                var to = transitionState.newContentRaw.find(".document-body").data("section");
-                $("body").data("section", to);
-                $("body").attr("data-section", to);
+            var to = transitionState.newContentRaw.find(".document-body").data("section");
+            $("body").data("section", to);
+            $("body").attr("data-section", to);
 
-                fromUrl = opts.url;
-                fromId = $data;
-                $from = opts.data;
+            fromUrl = opts.url;
+            fromId = $data;
+            $from = opts.data;
 
-                $(window).trigger("content_change.pushnav");
-                reEnhanceAjaxLink(opts.url);
-            });
+            $(window).trigger("content_change.pushnav");
+            reEnhanceAjaxLink(opts.url);
+        });
 
 
     }
@@ -387,6 +400,9 @@
         return !!(window.history && window.history.pushState);
     }
 
+    function isActivePushnav() {
+        return (!isModern && settings.disableNotModern) ? false : true ;
+    }
 
     /**
      * Return all params from a url
