@@ -6,6 +6,8 @@
 //               and override the browser history with pushState(or with hashtag for older browsers)
 
 //*******************************************************************************//
+// make it safe to use console.log always
+
 
 (function($) {
 
@@ -182,7 +184,7 @@
 
             var oldUrlClean = getUrlToClean(oldStateUrl);
 
-            if(newUrl && newUrl != oldUrlClean) {
+            if(newUrl && newUrl !== oldUrlClean) {
                 onStateChange(newUrl,settings.defaultTarget);
             }
 
@@ -227,6 +229,7 @@
     }
 
     function onStateChange(url,target) {
+
         $(window).trigger("state_change.pushnav");
         loadNewContent({url:url, target:target});
         oldStateUrl = url;
@@ -279,6 +282,7 @@
 
     function loadNewContent(opts) {
 
+
         var url = opts;
         if (typeof opts === 'object'){
             url = opts.url;
@@ -295,6 +299,7 @@
                 data = $("<div>"+getDocumentHtml(data,opts.url)+"</div>");
                 opts.data = data;
                 handleNewContent(opts);
+
             }, error: function(/*jqXHR, textStatus, errorThrown*/) {
                 $("body").css("cursor", "");
 
@@ -313,11 +318,14 @@
             transitionState,
             selectorArray = opts.target.split(',');
 
+
         $.each(selectorArray, function(index, value){
+
 
             var $elem = $(value);
             var targetWithoutPrefix = value.substr(1,value.length),
                 $data = $(opts.data).hasClass(targetWithoutPrefix) || $(opts.data).is("[id='"+targetWithoutPrefix+"']") ? $(opts.data) : $(opts.data).find(value);
+
 
             tempTransitions.push(swapTransition);
 
@@ -369,8 +377,10 @@
 
         $.each(queryArray, function(index, value){
             var queryParam = value.split("=");
+
             if(typeof queryParam[0] !== 'undefined'){
-                if(queryParam[0] !== "isAjax" && queryParam[0] !== "swaptarget"){
+
+                if(queryParam[0] !== "isAjax" && queryParam[0] !== "swaptarget" && queryParam[0] !== "_suid"){
                     notPushNavQuery = notPushNavQuery + value;
                 }
             }
